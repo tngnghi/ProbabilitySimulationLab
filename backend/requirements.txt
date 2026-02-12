@@ -12,4 +12,4 @@ redis
 numpy
 scipy
 passlib
-python-jose[cryptography]
+email-validator
