@@ -1,3 +1,4 @@
+import uvicorn
 from fastapi import Depends, FastAPI, HTTPException
 from psycopg2 import IntegrityError
 from app.models.user import User
@@ -6,12 +7,14 @@ from app.schemas.auth import UserResponse
 from sqlalchemy.orm import Session
 from app.core.security import hash_password, verify_password, create_access_token
 from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse
-from app.schemas import auth, experiment
+from app.api.routes import experiments
 from app.core.config import settings
 import logging
 from app.api.deps import get_current_user, get_db
 
 app = FastAPI()
+if __name__ == '__main__':
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, workers=4)
 logger = logging.getLogger(__name__)
 
 #Auth
@@ -54,7 +57,7 @@ async def get_current_user(current_user: User = Depends(get_current_user)):
     return UserResponse.from_orm(current_user)
 
 #Experiments
-app.include_router(experiment.router)
+app.include_router(experiments.router)
 
 # Health check
 @app.get("/health", status_code=200)

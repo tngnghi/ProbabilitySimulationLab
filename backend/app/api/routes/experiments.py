@@ -1,10 +1,10 @@
-from ast import List
+from typing import List
 import datetime
-from fastapi import APIRouter, Depends, Query, HTTPException, PaginatedExperimentResponse
+from fastapi import APIRouter, Depends, Query, HTTPException
 from app.api.deps import get_current_user, get_db
 from app.models.user import User
 from app.core import db
-from app.schemas.experiment import ExperimentDataResponse, ExperimentResponse, ExperimentUpdate, ExperimentCreateRequest
+from app.schemas.experiment import ExperimentDataResponse, ExperimentResponse, ExperimentUpdate, ExperimentDataCreate
 from app.models.experiment import Experiment, ExperimentData
 from sqlalchemy.orm import Session, joinedload
 from uuid import uuid4, UUID
@@ -12,7 +12,7 @@ from uuid import uuid4, UUID
 router = APIRouter(prefix="/experiments", tags=["experiments"])
 
 @router.post("", status_code=201, response_model=ExperimentResponse)
-async def create_experiment(experiment_data: ExperimentCreateRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def create_experiment(experiment_data: ExperimentDataCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     new_experiment = Experiment(
         id=uuid4(),
         user_id=current_user.id,
@@ -39,7 +39,7 @@ async def list_experiments(current_user: User = Depends(get_current_user), skip:
     experiments = db.query(Experiment).filter(Experiment.user_id == current_user.id).options(joinedload(Experiment.data)).order_by(Experiment.created_at.desc()).offset(skip).limit(limit).all()
     total = db.query(Experiment).filter(Experiment.user_id == current_user.id).count()
     items = [ExperimentResponse.from_orm(exp) for exp in experiments]
-    return PaginatedExperimentResponse(total=total, items=items, skip=skip, limit=limit)
+    return ExperimentResponse(total=total, items=items, skip=skip, limit=limit)
 
 
 @router.get("/{experiment_id}", response_model=ExperimentResponse, status_code=200)

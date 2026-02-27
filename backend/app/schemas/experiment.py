@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 import enum
 from typing import Optional
 from pydantic import BaseModel, Field, field_validator
@@ -46,8 +46,10 @@ class ExperimentResponse(BaseModel):
     updated_at: datetime
     data: Optional[dict] = None
 
-    class Config:
-        from_attributes = True
+    model_config = {
+        "from_attributes": True,
+        "arbitrary_types_allowed": True
+    }
 
 class ExperimentDataCreate(BaseModel):
     n_a: int = Field(..., min_length=1, gt=0)
@@ -61,7 +63,7 @@ class ExperimentDataResponse(BaseModel):
     n_b: int
     conv_b: int
     data_source: str = Field(enum)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow())
     
     @property
     def conv_rate_a(self) -> float:
