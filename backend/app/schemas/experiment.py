@@ -1,8 +1,8 @@
 from datetime import datetime
 import enum
-from typing import Optional
-from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import UUID
+from typing import Optional, List
+from pydantic import BaseModel, Field, field_validator, ConfigDict, computed_field
+from uuid import UUID
 
 
 class ExperimentCreate(BaseModel):
@@ -38,7 +38,7 @@ class ExperimentResponse(BaseModel):
     id: UUID
     user_id: UUID
     name: str
-    description: str
+    description: str |None = None
     alpha: float
     two_sided: bool
     metric: str
@@ -46,36 +46,59 @@ class ExperimentResponse(BaseModel):
     updated_at: datetime
     data: Optional[dict] = None
 
-    model_config = {
-        "from_attributes": True,
-        "arbitrary_types_allowed": True
-    }
+    model_config = ConfigDict(from_attributes =True, arbitrary_types_allowed =True)
 
 class ExperimentDataCreate(BaseModel):
-    n_a: int = Field(..., min_length=1, gt=0)
-    conv_a: int = Field(...,min_length=1, ge=0)
-    n_b: int = Field(..., min_length=1, gt=0)
-    conv_b: int = Field(..., min_length=1, ge=0)
+    n_a: int = Field(..., gt=0)
+    conv_a: int = Field(..., ge=0)
+    n_b: int = Field(..., gt=0)
+    conv_b: int = Field(..., ge=0)
 
+    @field_validator("n_a", "n_b")
+    def check_positive(cls,value):
+        if value <= 0:
+            raise ValueError("must be > 0")
+        return value
+    
+    @field_validator('conv_a')
+    def check_conv_a(cls, v, info):
+        if v < 0:
+            raise ValueError('must be >= 0')
+        if v > info.data.get('n_a', 0):
+            raise ValueError('conv_a cannot exceed n_a')
+        return v
+    
+    @field_validator('conv_b')
+    def check_conv_a(cls, v, info):
+        if v < 0:
+            raise ValueError('must be >= 0')
+        if v > info.data.get('n_b', 0):
+            raise ValueError('conv_b cannot exceed n_b')
+        return v
+    
 class ExperimentDataResponse(BaseModel):
     n_a: int
     conv_a: int
     n_b: int
     conv_b: int
     data_source: str = Field(enum)
-    updated_at: datetime = Field(default_factory=datetime.utcnow())
+    updated_at: datetime = Field(default_factory=datetime.now)
     
+    @computed_field
     @property
     def conv_rate_a(self) -> float:
         return self.conv_a / self.n_a if self.n_a > 0 else 0.0
     
+    @computed_field
     @property
     def conv_rate_b(self) -> float:
         return self.conv_b / self.n_b if self.n_b > 0 else 0.0
     
+    @computed_field
     @property
     def observed_lift(self) -> float:
-        return (self.conv_rate_b - self.conv_rate_a) / self.conv_rate_a if self.conv_rate_a > 0 else 0.0
+        if self.conv_rate_a == 0:
+            return 0.0
+        return (self.conv_rate_b - self.conv_rate_a) / self.conv_rate_a
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes = True)

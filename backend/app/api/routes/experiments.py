@@ -1,10 +1,9 @@
 from typing import List
-import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Query, HTTPException
 from app.api.deps import get_current_user, get_db
 from app.models.user import User
-from app.core import db
-from app.schemas.experiment import ExperimentDataResponse, ExperimentResponse, ExperimentUpdate, ExperimentDataCreate
+from app.schemas.experiment import ExperimentDataResponse, ExperimentResponse, ExperimentUpdate, ExperimentCreate, ExperimentDataCreate
 from app.models.experiment import Experiment, ExperimentData
 from sqlalchemy.orm import Session, joinedload
 from uuid import uuid4, UUID
@@ -12,7 +11,7 @@ from uuid import uuid4, UUID
 router = APIRouter(prefix="/experiments", tags=["experiments"])
 
 @router.post("", status_code=201, response_model=ExperimentResponse)
-async def create_experiment(experiment_data: ExperimentDataCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def create_experiment(experiment_data: ExperimentCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     new_experiment = Experiment(
         id=uuid4(),
         user_id=current_user.id,
@@ -21,8 +20,8 @@ async def create_experiment(experiment_data: ExperimentDataCreate, current_user:
         alpha=experiment_data.alpha,
         two_sided=experiment_data.two_sided,
         metric=experiment_data.metric,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc)
     )
     existing_name = db.query(Experiment).filter(Experiment.user_id == current_user.id, Experiment.name == experiment_data.name).first()
 
@@ -31,26 +30,33 @@ async def create_experiment(experiment_data: ExperimentDataCreate, current_user:
     db.add(new_experiment)
     db.commit()
     db.refresh(new_experiment)
-    return new_experiment
+    return ExperimentResponse.from_orm(new_experiment)
 
 
 @router.get("", response_model=List[ExperimentResponse])
-async def list_experiments(current_user: User = Depends(get_current_user), skip: int = Query(0, ge=0), limit: int = Query(10, ge=1, le=100)):
+async def list_experiments(current_user: User = Depends(get_current_user), db: Session = Depends(get_db), skip: int = Query(0, ge=0), limit: int = Query(10, ge=1, le=100)):
     experiments = db.query(Experiment).filter(Experiment.user_id == current_user.id).options(joinedload(Experiment.data)).order_by(Experiment.created_at.desc()).offset(skip).limit(limit).all()
-    total = db.query(Experiment).filter(Experiment.user_id == current_user.id).count()
-    items = [ExperimentResponse.from_orm(exp) for exp in experiments]
-    return ExperimentResponse(total=total, items=items, skip=skip, limit=limit)
+    return [ExperimentResponse.from_orm(exp) for exp in experiments]
 
 
 @router.get("/{experiment_id}", response_model=ExperimentResponse, status_code=200)
-async def get_experiment(experiment_id: UUID, current_user: User = Depends(get_current_user)):
+async def get_experiment(experiment_id: UUID, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     experiment = db.query(Experiment).filter(Experiment.id == experiment_id, Experiment.user_id == current_user.id).options(joinedload(Experiment.data)).first()
     if not experiment:
         raise HTTPException(status_code=404, detail="Experiment not found")
-    if experiment.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized to access this experiment")
-    data = db.query(ExperimentData).filter(ExperimentData.experiment_id == experiment.id).all()
-    response = ExperimentResponse(
+    
+    data_dict = None
+    if experiment.data:
+        data_dict = {
+            "n_a": experiment.data.n_a,
+            "conv_a": experiment.data.conv_a,
+            "n_b": experiment.data.n_b,
+            "conv_b": experiment.data.conv_b,
+            "data_source": experiment.data.data_source,
+            "updated_at": experiment.data.updated_at
+        }
+    
+    return ExperimentResponse(
         id=experiment.id,
         user_id=experiment.user_id,
         name=experiment.name,
@@ -60,24 +66,23 @@ async def get_experiment(experiment_id: UUID, current_user: User = Depends(get_c
         metric=experiment.metric,
         created_at=experiment.created_at,
         updated_at=experiment.updated_at,
-        data=ExperimentDataResponse(data=data)
+        data=data_dict
     )
-    return response
 
 
 @router.patch("/{experiment_id}", response_model=ExperimentResponse, status_code=200)
-async def update_experiment(experiment_id: UUID, update_data:ExperimentUpdate, current_user: User = Depends(get_current_user)):
+async def update_experiment(experiment_id: UUID, update_data:ExperimentUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     experiment = db.query(Experiment).filter(Experiment.id == experiment_id, Experiment.user_id == current_user.id).first()
     if not experiment:
         raise HTTPException(status_code=404, detail="Experiment not found")
-    if experiment.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized to update this experiment")
     
     # Check for name conflict
-    existing_name = db.query(Experiment).filter(Experiment.user_id == current_user.id, Experiment.id != experiment_id).first()
-    if existing_name:
-        raise HTTPException(status_code=400, detail="Experiment name already exists for this user")
-    
+    if update_data.name is not None:
+    # Check if another experiment has this name
+        existing_name = db.query(Experiment).filter(Experiment.user_id == current_user.id, Experiment.name == update_data.name, Experiment.id != experiment_id).first()
+        if existing_name:
+            raise HTTPException(status_code=400, detail="Experiment name already exists for this user")
+        experiment.name = update_data.name
     # Update fields
     if update_data.name is not None:
         experiment.name = update_data.name
@@ -92,12 +97,21 @@ async def update_experiment(experiment_id: UUID, update_data:ExperimentUpdate, c
     if update_data.metric is not None:
         experiment.metric = update_data.metric
 
-    experiment.updated_at = datetime.utcnow()
+    experiment.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(experiment)
-    data = db.query(ExperimentData).filter(ExperimentData.experiment_id == experiment.id).all()
-    experiment_response = ExperimentResponse(
-        id=experiment.id,
+    data_dict = None
+    if experiment.data:
+        data_dict = {
+            "n_a": experiment.data.n_a,
+            "conv_a": experiment.data.conv_a,
+            "n_b": experiment.data.n_b,
+            "conv_b": experiment.data.conv_b,
+            "data_source": experiment.data.data_source,
+            "updated_at": experiment.data.updated_at
+        }
+        
+    return ExperimentResponse(id=experiment.id,
         user_id=experiment.user_id,
         name=experiment.name,
         description=experiment.description,
@@ -106,13 +120,12 @@ async def update_experiment(experiment_id: UUID, update_data:ExperimentUpdate, c
         metric=experiment.metric,
         created_at=experiment.created_at,
         updated_at=experiment.updated_at,
-        data=ExperimentDataResponse(data=data)
-    )
-    return experiment_response
+        data=data_dict
+        )
 
 
 @router.delete("/{experiment_id}", status_code=204)
-async def delete_experiment(experiment_id: UUID, current_user: User = Depends(get_current_user)):
+async def delete_experiment(experiment_id: UUID, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     experiment = db.query(Experiment).filter(Experiment.id == experiment_id, Experiment.user_id == current_user.id).first()
     if not experiment:
         raise HTTPException(status_code=404, detail="Experiment not found")
@@ -120,32 +133,35 @@ async def delete_experiment(experiment_id: UUID, current_user: User = Depends(ge
         raise HTTPException(status_code=403, detail="Not authorized to delete this experiment")
     db.delete(experiment)
     db.commit()
-    response = {"message": "Experiment deleted successfully"}
-    return response
 
-@router.post("/{experiment_id}/data/aggregate", response_model=ExperimentDataResponse, status_code=200)
-async def update_experiment_data(experiment_id: UUID, data: ExperimentUpdate, current_user: User = Depends(get_current_user)):
+@router.post("/{experiment_id}/data/aggregate", response_model=ExperimentDataResponse, status_code=201)
+async def upload_experiment_data(experiment_id: UUID, data: ExperimentDataCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    # Verify experiment exists and belongs to user
     experiment = db.query(Experiment).filter(Experiment.id == experiment_id, Experiment.user_id == current_user.id).first()
     if not experiment:
         raise HTTPException(status_code=404, detail="Experiment not found")
-    if experiment.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized to update this experiment's data")
     
+    # Validate data BEFORE using
+    if data.n_a <= 0 or data.n_b <= 0:
+        raise HTTPException(status_code=422, detail="n_a and n_b must be > 0")
+    if data.conv_a < 0 or data.conv_b < 0:
+        raise HTTPException(status_code=422, detail="Conversions cannot be negative")
+    if data.conv_a > data.n_a or data.conv_b > data.n_b:
+        raise HTTPException(status_code=422, detail="Conversions cannot exceed samples")
+    
+    # Check if data exists
     existing_data = db.query(ExperimentData).filter(ExperimentData.experiment_id == experiment_id).first()
     
-    if existing_data.con_a > existing_data.n_a or existing_data.conv_b > existing_data.n_b:
-        raise HTTPException(status_code=422, detail="Conv_A cannot be greater than N_A and Conv_B cannot be greater than N_B")
     if existing_data:
-        if data.n_a is not None:
-            existing_data.n_a = data.n_a
-        if data.conv_a is not None:
-            existing_data.conv_a = data.conv_a
-        if data.n_b is not None:
-            existing_data.n_b = data.n_b
-        if data.conv_b is not None:
-            existing_data.conv_b = data.conv_b
-        existing_data.updated_at = datetime.utcnow()
+        # Update
+        existing_data.n_a = data.n_a
+        existing_data.conv_a = data.conv_a
+        existing_data.n_b = data.n_b
+        existing_data.conv_b = data.conv_b
+        existing_data.updated_at = datetime.now(timezone.utc)
     else:
+        # Create
         new_data = ExperimentData(
             experiment_id=experiment_id,
             n_a=data.n_a,
@@ -153,10 +169,13 @@ async def update_experiment_data(experiment_id: UUID, data: ExperimentUpdate, cu
             n_b=data.n_b,
             conv_b=data.conv_b,
             data_source="aggregate",
-            updated_at=datetime.utcnow()
+            updated_at=datetime.now(timezone.utc)
         )
         db.add(new_data)
     
     db.commit()
+    
+    # Fetch and return
     updated_data = db.query(ExperimentData).filter(ExperimentData.experiment_id == experiment_id).first()
-    return updated_data
+    
+    return ExperimentDataResponse.from_orm(updated_data)

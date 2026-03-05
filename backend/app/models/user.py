@@ -1,7 +1,6 @@
-from sqlalchemy import Column, String, DateTime
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, DateTime, UUID
 from uuid import uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import relationship
 
 from app.models import Base
@@ -13,9 +12,9 @@ class User(Base) :
     id = Column(UUID, primary_key=True, default = uuid4)
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
 
-    #experiments = relationship("Experiment", back_populates="user", cascade="all, delete-orphan")
+    experiments = relationship("Experiment", back_populates="user", cascade="all, delete-orphan")
 
 """Lazy Loading vs Eager Loading: The Crucial Part
 This is where (lazy-loaded) comes in.

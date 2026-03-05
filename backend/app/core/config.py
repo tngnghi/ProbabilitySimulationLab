@@ -1,13 +1,14 @@
 from pathlib import Path
 """from fastapi import Depends, FastAPI
 from fastapi.security import OAuth2PasswordBearer"""
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 class Settings(BaseSettings):
     database_url: str 
-    jwt_secret: str
+    jwt_secret: str = Field(..., alias="JWT_SECRET")
     env_name: str = "development"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 7

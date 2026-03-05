@@ -27,16 +27,20 @@ async def get_current_user(token:str = Depends(oauth2_scheme), db: Session = Dep
         headers={"WWW-Authenticate": "Bearer"},
     )
 
+    print(f"Token: {token}")
+
     try:
         payload = verify_access_token(token)
+        print(f"Payload: {payload}")
         user_id = payload.get("user_id")
+        print(f"User ID: {user_id}")
         if user_id is None:
             raise credentials_exception
-    except JWTError:
+        user = db.query(User).filter(User.id == user_id).first()
+
+        if user is None:
+            raise credentials_exception
+        return user
+    except Exception as e:
+        print(f"Exception: {e}")
         raise credentials_exception
-    
-    user = db.query(User).filter(User.id == user_id).first()
-    if user is None:
-        raise credentials_exception
-    
-    return user
