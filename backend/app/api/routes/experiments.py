@@ -3,9 +3,10 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Query, HTTPException
 from app.api.deps import get_current_user, get_db
 from app.models.user import User
-from app.schemas.experiment import ExperimentDataResponse, ExperimentResponse, ExperimentUpdate, ExperimentCreate, ExperimentDataCreate
+from app.schemas.experiment import ExperimentDataResponse, ExperimentResponse, ExperimentUpdate, ExperimentCreate, ExperimentDataCreate, ExperimentDataUpdate
 from app.models.experiment import Experiment, ExperimentData
 from sqlalchemy.orm import Session, joinedload
+from app.services.validations import validate_aggregated_data
 from uuid import uuid4, UUID
 
 router = APIRouter(prefix="/experiments", tags=["experiments"])
@@ -150,6 +151,8 @@ async def upload_experiment_data(experiment_id: UUID, data: ExperimentDataCreate
     if data.conv_a > data.n_a or data.conv_b > data.n_b:
         raise HTTPException(status_code=422, detail="Conversions cannot exceed samples")
     
+    warnings_list = validate_aggregated_data(data.n_a, data.conv_a, data.n_b, data.conv_b)
+    
     # Check if data exists
     existing_data = db.query(ExperimentData).filter(ExperimentData.experiment_id == experiment_id).first()
     
@@ -172,10 +175,59 @@ async def upload_experiment_data(experiment_id: UUID, data: ExperimentDataCreate
             updated_at=datetime.now(timezone.utc)
         )
         db.add(new_data)
+        existing_data = new_data
     
     db.commit()
+    db.refresh(existing_data)
     
     # Fetch and return
-    updated_data = db.query(ExperimentData).filter(ExperimentData.experiment_id == experiment_id).first()
+    existing_data.warnings = warnings_list
     
-    return ExperimentDataResponse.from_orm(updated_data)
+    return ExperimentDataResponse.from_orm(existing_data)
+
+@router.get("/{experiment_id}/data", response_model=ExperimentDataResponse, status_code=200)
+async def access_experiment_data(experiment_id: UUID, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    experiments = db.query(Experiment).filter(ExperimentData.experiment_id == experiment_id, Experiment.user_id == current_user.id).options(joinedload(Experiment.data)).order_by(Experiment.created_at.desc()).all()
+    if not experiments:
+        raise HTTPException(status_code=404, detail="Experiment not found")
+    existing_data = db.query(ExperimentData).first()
+    if not existing_data:
+        raise HTTPException(status_code=204, detail="No Content (empty)")
+
+    return ExperimentDataResponse.from_orm(existing_data)
+
+@router.patch("/{experiment_id}/data", response_model=ExperimentDataResponse, status_code=200)
+async def update_experiment_data(experiment_id: UUID, update_data:ExperimentDataUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    experiments = db.query(Experiment).filter(ExperimentData.experiment_id == experiment_id, Experiment.user_id == current_user.id).first()
+    if not experiments:
+        raise HTTPException(status_code=404, detail="Experiment not found")
+    existing_data = db.query(ExperimentData).first()
+
+    if update_data.n_a is not None:
+        if update_data.n_a <= 0:
+            raise HTTPException(status_code=422, detail="n_a must be > 0")
+        existing_data.n_a = update_data.n_a
+    if update_data.n_b is not None:
+        if update_data.n_b <= 0:
+            raise HTTPException(status_code=422, detail="n_b must be > 0")
+        existing_data.n_b = update_data.n_b
+    if update_data.conv_a is not None:
+        if update_data.conv_a < 0:
+            raise HTTPException(status_code=422, detail="Conversions cannot be negative")
+        existing_data.conv_a = update_data.conv_a
+    if update_data.conv_b is not None:
+        if update_data.conv_b < 0:
+            raise HTTPException(status_code=422, detail="Conversions cannot be negative")
+        existing_data.conv_b = update_data.conv_b
+    if existing_data.conv_a > existing_data.n_a or existing_data.conv_b > existing_data.n_b:
+        raise HTTPException(status_code=422, detail="Conversions cannot exceed samples")
+
+    warnings_list = validate_aggregated_data(existing_data.n_a, existing_data.conv_a, existing_data.n_b, existing_data.conv_b)
+
+    existing_data.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(existing_data)
+
+    existing_data.warnings = warnings_list
+    
+    return ExperimentDataResponse.from_orm(existing_data)

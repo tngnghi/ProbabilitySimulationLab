@@ -1,6 +1,6 @@
 from datetime import datetime
 import enum
-from typing import Optional, List
+from typing import Optional
 from pydantic import BaseModel, Field, field_validator, ConfigDict, computed_field
 from uuid import UUID
 
@@ -45,6 +45,7 @@ class ExperimentResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     data: Optional[dict] = None
+    warnings: Optional[list[str]] = None
 
     model_config = ConfigDict(from_attributes =True, arbitrary_types_allowed =True)
 
@@ -69,7 +70,7 @@ class ExperimentDataCreate(BaseModel):
         return v
     
     @field_validator('conv_b')
-    def check_conv_a(cls, v, info):
+    def check_conv_b(cls, v, info):
         if v < 0:
             raise ValueError('must be >= 0')
         if v > info.data.get('n_b', 0):
@@ -83,22 +84,12 @@ class ExperimentDataResponse(BaseModel):
     conv_b: int
     data_source: str = Field(enum)
     updated_at: datetime = Field(default_factory=datetime.now)
-    
-    @computed_field
-    @property
-    def conv_rate_a(self) -> float:
-        return self.conv_a / self.n_a if self.n_a > 0 else 0.0
-    
-    @computed_field
-    @property
-    def conv_rate_b(self) -> float:
-        return self.conv_b / self.n_b if self.n_b > 0 else 0.0
-    
-    @computed_field
-    @property
-    def observed_lift(self) -> float:
-        if self.conv_rate_a == 0:
-            return 0.0
-        return (self.conv_rate_b - self.conv_rate_a) / self.conv_rate_a
+    warnings: Optional[list[str]] = None
     
     model_config = ConfigDict(from_attributes = True)
+
+class ExperimentDataUpdate(BaseModel):
+    n_a: Optional[int] = None
+    conv_a: Optional[int] = None
+    n_b: Optional[int] = None
+    conv_b: Optional[int] = None
