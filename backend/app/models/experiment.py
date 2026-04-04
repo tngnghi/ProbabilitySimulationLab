@@ -20,7 +20,7 @@ class Experiment(Base):
     # Relationships
     user = relationship("User", back_populates="experiments")
     data = relationship("ExperimentData", back_populates="experiment", uselist=False, cascade="all, delete-orphan")
-    # runs = relationship("Run", back_populates="experiment", cascade="all, delete-orphan")
+    runs = relationship("Run", back_populates="experiment", cascade="all, delete-orphan")
 
 class ExperimentData(Base):
     __tablename__ = "experiment_data"

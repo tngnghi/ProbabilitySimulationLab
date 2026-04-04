@@ -5,6 +5,9 @@ from app.api.deps import get_current_user, get_db
 from app.models.user import User
 from app.schemas.experiment import ExperimentDataResponse, ExperimentResponse, ExperimentUpdate, ExperimentCreate, ExperimentDataCreate, ExperimentDataUpdate
 from app.models.experiment import Experiment, ExperimentData
+from app.schemas.run import RunCreate, RunResponse, RunResultResponse
+from app.models.run import Run, RunResult
+from app.services.stats import z_test_two_proportions
 from sqlalchemy.orm import Session, joinedload
 from app.services.validations import validate_aggregated_data
 from uuid import uuid4, UUID
@@ -231,3 +234,60 @@ async def update_experiment_data(experiment_id: UUID, update_data:ExperimentData
     existing_data.warnings = warnings_list
     
     return ExperimentDataResponse.from_orm(existing_data)
+
+@router.post("/{experiment_id}/runs", response_model=RunResponse, status_code=201)
+async def uploads_run(experiment_id: UUID, run_req: RunCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    experiment = db.query(Experiment).join(ExperimentData).filter(ExperimentData.experiment_id == experiment_id, Experiment.user_id == current_user.id).first()
+    if not experiment:
+        raise HTTPException(status_code=404, detail="Experiment not found")
+    
+    if not experiment.data:
+        raise HTTPException(status_code=400, detail="Please upload data first")
+    
+    run_req.validate_conditional_logic()
+
+    new_run = Run(
+        id = uuid4(),
+        experiment_id = experiment_id,
+        method = run_req.method,
+        n_sim = run_req.n_sim,
+        seed = run_req.seed,
+        status = "queued",
+        progress = 0.0,
+        created_at = datetime.utcnow()
+    )
+    db.add(new_run)
+    db.commit()
+    db.refresh(new_run)
+
+    new_run.status = "running"
+    new_run.started_at = datetime.utcnow()
+    db.commit()
+
+    try:
+        if run_req.method == "ztest":
+            
+            stats_output = z_test_two_proportions(experiment.n_a, experiment.conv_a, experiment.n_b, experiment.conv_b, experiment.two_sided)
+
+            run_result = RunResult(
+                run_id=new_run.id,
+                observed_lift=stats_output["observed_lift"],
+                p_value=stats_output["p_value"],
+                z_statistic=stats_output["z_statistic"],
+                significant=stats_output["significant"],
+                summary_json=stats_output
+            )
+            db.add(run_result)
+            
+            new_run.status = "success"
+            new_run.finished_at = datetime.utcnow()
+            db.commit()
+            db.refresh(new_run)
+            
+            return new_run
+
+    except Exception as e:
+        new_run.status = "failed"
+        new_run.error_message = str(e)
+        db.commit()
+        raise HTTPException(status_code=500, detail="Analysis failed")
