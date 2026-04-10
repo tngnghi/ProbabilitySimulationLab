@@ -190,10 +190,10 @@ async def upload_experiment_data(experiment_id: UUID, data: ExperimentDataCreate
 
 @router.get("/{experiment_id}/data", response_model=ExperimentDataResponse, status_code=200)
 async def access_experiment_data(experiment_id: UUID, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    experiments = db.query(Experiment).filter(ExperimentData.experiment_id == experiment_id, Experiment.user_id == current_user.id).options(joinedload(Experiment.data)).order_by(Experiment.created_at.desc()).all()
-    if not experiments:
+    experiment = db.query(Experiment).filter(Experiment.id == experiment_id, Experiment.user_id == current_user.id).first()
+    if not experiment:
         raise HTTPException(status_code=404, detail="Experiment not found")
-    existing_data = db.query(ExperimentData).first()
+    existing_data = db.query(ExperimentData).filter(ExperimentData.experiment_id == experiment_id).first()
     if not existing_data:
         raise HTTPException(status_code=204, detail="No Content (empty)")
 
@@ -201,10 +201,10 @@ async def access_experiment_data(experiment_id: UUID, current_user: User = Depen
 
 @router.patch("/{experiment_id}/data", response_model=ExperimentDataResponse, status_code=200)
 async def update_experiment_data(experiment_id: UUID, update_data:ExperimentDataUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    experiments = db.query(Experiment).filter(ExperimentData.experiment_id == experiment_id, Experiment.user_id == current_user.id).first()
+    experiments = db.query(Experiment).filter(Experiment.id == experiment_id, Experiment.user_id == current_user.id).first()
     if not experiments:
         raise HTTPException(status_code=404, detail="Experiment not found")
-    existing_data = db.query(ExperimentData).first()
+    existing_data = db.query(ExperimentData).filter(ExperimentData.experiment == experiment_id).first()
 
     if update_data.n_a is not None:
         if update_data.n_a <= 0:
@@ -267,15 +267,17 @@ async def uploads_run(experiment_id: UUID, run_req: RunCreate, current_user: Use
     try:
         if run_req.method == "ztest":
             
-            stats_output = z_test_two_proportions(experiment.n_a, experiment.conv_a, experiment.n_b, experiment.conv_b, experiment.two_sided)
+            result = z_test_two_proportions(experiment.data.n_a, experiment.data.conv_a, experiment.data.n_b, experiment.data.conv_b, experiment.two_sided)
 
             run_result = RunResult(
                 run_id=new_run.id,
-                observed_lift=stats_output["observed_lift"],
-                p_value=stats_output["p_value"],
-                z_statistic=stats_output["z_statistic"],
-                significant=stats_output["significant"],
-                summary_json=stats_output
+                observed_lift=float(result["observed_lift"]),
+                p_value = float(result["p_value"]),
+                z_statistic = float(result["z_statistic"]),
+                ci_low = float(result["ci_low"]) if result["ci_low"] is not None else None,
+                ci_high = float(result["ci_high"]) if result["ci_high"] is not None else None,
+                significant = bool(result["significant"]),
+                summary = str(result["summary"])
             )
             db.add(run_result)
             

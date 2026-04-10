@@ -4,3 +4,4 @@ Base = declarative_base()
 
 from app.models.user import User
 from app.models.experiment import Experiment, ExperimentData
+from app.models.run import Run, RunResult

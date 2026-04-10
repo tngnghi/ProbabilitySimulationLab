@@ -6,11 +6,11 @@ logger.setLevel(logging.WARNING)
 def validate_sample_sizes(n_a,n_b) -> list[str]:
     warnings = []
     if n_a < 100 or n_b < 100:
-        msg = "Small sample size detected: n_a={n_a}, n_b={n_b}"
+        msg = f"Small sample size detected: n_a={n_a}, n_b={n_b}"
         logger.warning(msg)
         warnings.append(msg)
     if  n_a > 100000000 or n_b > 100000000:
-        msg = "Large sample size detected: n_a={n_a}, n_b={n_b}"
+        msg = f"Large sample size detected: n_a={n_a}, n_b={n_b}"
         logger.warning(msg)
         warnings.append(msg)
     return warnings

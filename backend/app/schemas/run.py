@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, Literal, Any
-from pydantic import BaseModel, Field, field_validator, computed_field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, computed_field, model_validator
 from uuid import UUID
 
 class RunCreate(BaseModel):
@@ -22,8 +22,8 @@ class RunResultResponse(BaseModel):
     observed_lift: float
     p_value: float
     z_statistic: Optional[float] = None
-    ci_low: float
-    ci_high: float
+    ci_low: Optional[float] = None
+    ci_high: Optional[float] = None
     significant: bool
     summary_json: Optional[dict[str, Any]] = Field(None, exclude=True)
 
@@ -36,7 +36,7 @@ class RunResultResponse(BaseModel):
         return "No summary available."
 
 class RunResponse(BaseModel):
-    run_id: UUID
+    id: UUID
     experiment_id: UUID
     method: str
     status: Literal["queued", "running", "success", "failed"]
@@ -46,6 +46,8 @@ class RunResponse(BaseModel):
     progress: Optional[float] = Field(default = None, ge = 0.0, le = 1.0)
     error_message: Optional[str]
     results: Optional[RunResultResponse] = None
+
+    model_config = ConfigDict(from_attributes = True)
 
     @model_validator(mode='after')
     def validate_run_status(self) -> 'RunResponse':

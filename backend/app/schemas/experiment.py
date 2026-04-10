@@ -1,6 +1,6 @@
 from datetime import datetime
 import enum
-from typing import Optional
+from typing import Optional, Literal
 from pydantic import BaseModel, Field, field_validator, ConfigDict, computed_field
 from uuid import UUID
 
@@ -82,7 +82,7 @@ class ExperimentDataResponse(BaseModel):
     conv_a: int
     n_b: int
     conv_b: int
-    data_source: str = Field(enum)
+    data_source: Literal["aggregate","events"]
     updated_at: datetime = Field(default_factory=datetime.now)
     warnings: Optional[list[str]] = None
     
