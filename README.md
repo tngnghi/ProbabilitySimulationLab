@@ -22,3 +22,35 @@ A full-stack web platform for running statistical experiments, A/B tests, and si
 | Statistics | SciPy, NumPy |
 
 ## Architecture
+frontend/         # (in progress)
+backend/
+app/
+api/routes/   # REST endpoints: auth, experiments, runs
+models/       # SQLAlchemy ORM: User, Experiment, ExperimentData, Run, RunResult
+schemas/      # Pydantic request/response validation
+services/     # stats.py (z-test), validations.py
+core/         # config, db session, security (JWT)
+alembic/        # DB migration history
+docker-compose.yml
+## API Highlights
+
+- `POST /auth/register` / `POST /auth/login` — user registration & token issuance
+- `POST /experiments` — create a named experiment with configurable alpha & metric
+- `POST /experiments/{id}/data/aggregate` — upload A/B group data
+- `POST /experiments/{id}/runs` — run z-test analysis
+- `GET /experiments` — list all experiments for the authenticated user
+
+## Running Locally
+
+```bash
+cp backend/.env.example backend/.env
+# Fill in your DB credentials and JWT secret
+
+docker-compose up --build
+# API available at http://localhost:8000
+# Docs at http://localhost:8000/docs
+```
+
+## Status
+
+🚧 Active development — frontend and permutation test method in progress.
