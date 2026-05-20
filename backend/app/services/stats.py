@@ -57,8 +57,8 @@ def z_test_two_proportions(n_a: int, conv_a: int, n_b: int, conv_b: int, two_sid
     ci_high = p_hat_b + 1.96 * math.sqrt(p_hat_b * (1 - p_hat_b) / n_b)
 
     
-    if p_value < 0.05:
-        significant = True
+    significant = p_value < 0.05
+    summary = generate_summary(observed_lift, p_value, significant)
     
     return {
         "observed_lift": observed_lift,
@@ -68,7 +68,8 @@ def z_test_two_proportions(n_a: int, conv_a: int, n_b: int, conv_b: int, two_sid
         "p_value": p_value,
         "ci_low": ci_low,
         "ci_high": ci_high,
-        "significant": significant
+        "significant": significant,
+        "summary": summary,
         }
 
 """I see you've shared your GitHub repository link, but it’s not yet available. Based on the errors you've been encountering, I’ll provide **exact code fixes** you can apply to your existing files.

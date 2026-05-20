@@ -237,12 +237,18 @@ async def update_experiment_data(experiment_id: UUID, update_data:ExperimentData
 
 @router.post("/{experiment_id}/runs", response_model=RunResponse, status_code=201)
 async def uploads_run(experiment_id: UUID, run_req: RunCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    experiment = db.query(Experiment).join(ExperimentData).filter(ExperimentData.experiment_id == experiment_id, Experiment.user_id == current_user.id).first()
+    experiment = db.query(Experiment).filter(
+        Experiment.id == experiment_id
+    ).first()
+
     if not experiment:
         raise HTTPException(status_code=404, detail="Experiment not found")
-    
-    if not experiment.data:
-        raise HTTPException(status_code=400, detail="Please upload data first")
+
+    if experiment.user_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to access this experiment"
+        )
     
     run_req.validate_conditional_logic()
 
@@ -277,7 +283,7 @@ async def uploads_run(experiment_id: UUID, run_req: RunCreate, current_user: Use
                 ci_low = float(result["ci_low"]) if result["ci_low"] is not None else None,
                 ci_high = float(result["ci_high"]) if result["ci_high"] is not None else None,
                 significant = bool(result["significant"]),
-                summary = str(result["summary"])
+                summary_json={"summary": result["summary"]},
             )
             db.add(run_result)
             
@@ -289,7 +295,8 @@ async def uploads_run(experiment_id: UUID, run_req: RunCreate, current_user: Use
             return new_run
 
     except Exception as e:
+        db.rollback()
         new_run.status = "failed"
         new_run.error_message = str(e)
         db.commit()
-        raise HTTPException(status_code=500, detail="Analysis failed")
+        raise HTTPException(status_code=500, detail=str(e))
