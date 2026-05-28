@@ -12,7 +12,27 @@ from app.core.config import settings
 import logging
 from app.api.deps import get_current_user, get_db
 
-app = FastAPI()
+import json
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+
+
+class PrettyJSONResponse(JSONResponse):
+    def render(self, content) -> bytes:
+        return json.dumps(
+            content,
+            ensure_ascii=False,
+            allow_nan=False,
+            indent=2,
+            default=str,
+        ).encode("utf-8")
+
+
+app = FastAPI(
+    title="Probability Simulation Lab",
+    default_response_class=PrettyJSONResponse,
+)
+
 if __name__ == '__main__':
     uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, workers=4)
 logger = logging.getLogger(__name__)
@@ -53,7 +73,7 @@ async def login(payload: LoginRequest, db: Session = Depends(get_db)):
     return TokenResponse(access_token=token, token_type="bearer")
 
 @app.get("/me", response_model=UserResponse)
-async def get_current_user(current_user: User = Depends(get_current_user)):
+async def read_current_user(current_user: User = Depends(get_current_user)):
     return UserResponse.from_orm(current_user)
 
 #Experiments

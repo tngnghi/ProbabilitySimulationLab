@@ -1,39 +1,70 @@
 from datetime import datetime, timezone
 from uuid import uuid4
-from sqlalchemy import Column, String, DateTime, ForeignKey, Float, Boolean, Integer, Enum, UUID, JSON
-from app.core.db import Base
+
+from sqlalchemy import Column, String, DateTime, ForeignKey, Float, Boolean, Integer, Enum, JSON
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+
+from app.core.db import Base
+
+
+def utc_now():
+    return datetime.now(timezone.utc)
+
 
 class Run(Base):
     __tablename__ = "runs"
-    
-    id = Column(UUID, primary_key=True, default=uuid4)
-    experiment_id = Column(UUID, ForeignKey("experiments.id"), nullable=False)
-    method = Column(Enum("ztest", "permutation", name="run_method"), nullable=False, )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    experiment_id = Column(UUID(as_uuid=True), ForeignKey("experiments.id"), nullable=False)
+
+    method = Column(Enum("ztest", "permutation", name="run_method"), nullable=False)
     n_sim = Column(Integer, default=20000, nullable=True)
     seed = Column(Integer, nullable=True)
-    status = Column(Enum("queued", "running", "success", "failed", name="run_status"), default="queued")
-    progress = Column(Float, default=0.0, nullable=True)
+
+    status = Column(
+        Enum("queued", "running", "success", "failed", name="run_status"),
+        default="queued",
+        nullable=False,
+    )
+
+    progress = Column(Float, default=0.0, nullable=False)
     error_message = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    started_at = Column(DateTime, nullable=True)
-    finished_at = Column(DateTime, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    finished_at = Column(DateTime(timezone=True), nullable=True)
 
     experiment = relationship("Experiment", back_populates="runs")
-    results = relationship("RunResult", uselist=False, back_populates="run", cascade="all, delete-orphan")
+    results = relationship(
+        "RunResult",
+        uselist=False,
+        back_populates="run",
+        cascade="all, delete-orphan",
+    )
+
 
 class RunResult(Base):
     __tablename__ = "run_results"
 
-    run_id = Column(UUID, ForeignKey("runs.id"), primary_key = True)
-    observed_lift = Column(Float, nullable=False)
-    p_value = Column(Float, default=0.0, nullable=False)
+    run_id = Column(UUID(as_uuid=True), ForeignKey("runs.id"), primary_key=True)
+
+    conversion_rate_a = Column(Float, nullable=True)
+    conversion_rate_b = Column(Float, nullable=True)
+
+    absolute_lift = Column(Float, nullable=True)
+    relative_lift = Column(Float, nullable=True)
+
+    p_value = Column(Float, nullable=False)
     z_statistic = Column(Float, nullable=True)
-    ci_low = Column(Float, nullable=True)
-    ci_high = Column(Float, nullable=True)
-    significant = Column(Boolean)
+
+    absolute_lift_ci_low = Column(Float, nullable=True)
+    absolute_lift_ci_high = Column(Float, nullable=True)
+    
+    significant = Column(Boolean, nullable=False)
     summary_json = Column(JSON, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+
+    created_at = Column(DateTime(timezone=True), default=utc_now)
 
     run = relationship("Run", back_populates="results")
     """The RunResult Model (For Later: Week 8)

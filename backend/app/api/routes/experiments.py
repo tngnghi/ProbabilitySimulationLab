@@ -157,7 +157,7 @@ async def upload_experiment_data(experiment_id: UUID, data: ExperimentDataCreate
     warnings_list = validate_aggregated_data(data.n_a, data.conv_a, data.n_b, data.conv_b)
     
     # Check if data exists
-    existing_data = db.query(ExperimentData).filter(ExperimentData.experiment_id == experiment_id).first()
+    existing_data = (db.query(ExperimentData).filter(ExperimentData.experiment_id == experiment_id).first())
     
     if existing_data:
         # Update
@@ -204,7 +204,14 @@ async def update_experiment_data(experiment_id: UUID, update_data:ExperimentData
     experiments = db.query(Experiment).filter(Experiment.id == experiment_id, Experiment.user_id == current_user.id).first()
     if not experiments:
         raise HTTPException(status_code=404, detail="Experiment not found")
-    existing_data = db.query(ExperimentData).filter(ExperimentData.experiment == experiment_id).first()
+    existing_data = (
+        db.query(ExperimentData)
+        .filter(ExperimentData.experiment_id == experiment_id)
+        .first()
+    )
+
+    if not existing_data:
+        raise HTTPException(status_code=404, detail="Experiment data not found")
 
     if update_data.n_a is not None:
         if update_data.n_a <= 0:
@@ -236,67 +243,110 @@ async def update_experiment_data(experiment_id: UUID, update_data:ExperimentData
     return ExperimentDataResponse.from_orm(existing_data)
 
 @router.post("/{experiment_id}/runs", response_model=RunResponse, status_code=201)
-async def uploads_run(experiment_id: UUID, run_req: RunCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    experiment = db.query(Experiment).filter(
-        Experiment.id == experiment_id
-    ).first()
+async def create_run(
+    experiment_id: UUID,
+    run_req: RunCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    experiment = (
+        db.query(Experiment)
+        .options(joinedload(Experiment.data))
+        .filter(
+            Experiment.id == experiment_id,
+            Experiment.user_id == current_user.id,
+        )
+        .first()
+    )
 
     if not experiment:
         raise HTTPException(status_code=404, detail="Experiment not found")
 
-    if experiment.user_id != current_user.id:
+    if experiment.data is None:
         raise HTTPException(
-            status_code=403,
-            detail="Not authorized to access this experiment"
+            status_code=400,
+            detail="No experiment data uploaded. Upload aggregate data before running analysis.",
         )
-    
+
     run_req.validate_conditional_logic()
 
+    if run_req.method != "ztest":
+        raise HTTPException(
+            status_code=501,
+            detail="Only ztest is currently implemented. Permutation testing is in progress.",
+        )
+
     new_run = Run(
-        id = uuid4(),
-        experiment_id = experiment_id,
-        method = run_req.method,
-        n_sim = run_req.n_sim,
-        seed = run_req.seed,
-        status = "queued",
-        progress = 0.0,
-        created_at = datetime.utcnow()
+        id=uuid4(),
+        experiment_id=experiment_id,
+        method=run_req.method,
+        n_sim=run_req.n_sim,
+        seed=run_req.seed,
+        status="queued",
+        progress=0.0,
+        created_at=datetime.now(timezone.utc),
     )
+
     db.add(new_run)
     db.commit()
     db.refresh(new_run)
 
-    new_run.status = "running"
-    new_run.started_at = datetime.utcnow()
-    db.commit()
-
     try:
-        if run_req.method == "ztest":
-            
-            result = z_test_two_proportions(experiment.data.n_a, experiment.data.conv_a, experiment.data.n_b, experiment.data.conv_b, experiment.two_sided)
+        new_run.status = "running"
+        new_run.started_at = datetime.now(timezone.utc)
+        new_run.progress = 0.25
+        db.commit()
 
-            run_result = RunResult(
-                run_id=new_run.id,
-                observed_lift=float(result["observed_lift"]),
-                p_value = float(result["p_value"]),
-                z_statistic = float(result["z_statistic"]),
-                ci_low = float(result["ci_low"]) if result["ci_low"] is not None else None,
-                ci_high = float(result["ci_high"]) if result["ci_high"] is not None else None,
-                significant = bool(result["significant"]),
-                summary_json={"summary": result["summary"]},
-            )
-            db.add(run_result)
-            
-            new_run.status = "success"
-            new_run.finished_at = datetime.utcnow()
-            db.commit()
-            db.refresh(new_run)
-            
-            return new_run
+        result = z_test_two_proportions(
+            n_a=experiment.data.n_a,
+            conv_a=experiment.data.conv_a,
+            n_b=experiment.data.n_b,
+            conv_b=experiment.data.conv_b,
+            alpha=experiment.alpha,
+            two_sided=experiment.two_sided,
+        )
+
+        run_result = RunResult(
+            run_id=new_run.id,
+            conversion_rate_a=float(result["conversion_rate_a"]),
+            conversion_rate_b=float(result["conversion_rate_b"]),
+            absolute_lift=float(result["absolute_lift"]),
+            relative_lift=(
+                float(result["relative_lift"])
+                if result["relative_lift"] is not None
+                else None
+            ),
+            p_value=float(result["p_value"]),
+            z_statistic=float(result["z_statistic"]),
+            absolute_lift_ci_low=float(result["absolute_lift_ci_low"]),
+            absolute_lift_ci_high=float(result["absolute_lift_ci_high"]),
+            significant=bool(result["significant"]),
+            summary_json={"summary": result["summary"]},
+        )
+
+        db.add(run_result)
+
+        new_run.status = "success"
+        new_run.progress = 1.0
+        new_run.finished_at = datetime.now(timezone.utc)
+
+        db.commit()
+        db.refresh(new_run)
+
+        return new_run
+
+    except HTTPException:
+        raise
 
     except Exception as e:
         db.rollback()
+
         new_run.status = "failed"
+        new_run.progress = 0.0
         new_run.error_message = str(e)
+        new_run.finished_at = datetime.now(timezone.utc)
+
         db.commit()
+        db.refresh(new_run)
+
         raise HTTPException(status_code=500, detail=str(e))

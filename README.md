@@ -75,13 +75,18 @@ The analysis computes:
 Example result shape:
 ```json
 {
-  "observed_lift":0.31055900621118016,
-  "p_value":0.05391604210018319,
-  "z_statistic":1.9275104894106296,
-  "ci_low":0.08636275484039944,
-  "ci_high":0.12442645594881134,
-  "significant":false,
-  "summary":"No significant difference detected (p=0.054, lift=31.1%)"
+    "conversion_rate_a": 0.08,
+    "conversion_rate_b": 0.105,
+    "absolute_lift": 0.024999999999999994,
+    "relative_lift": 0.31249999999999994,
+    "p_value": 0.05367651006667207,
+    "z_statistic": 1.9294379999000397,
+    "absolute_lift_ci_low": -0.0003718832938711565,
+    "absolute_lift_ci_high": 0.05037188329387114,
+    "significant": false,
+    "summary_json": {
+      "summary": "No statistically significant difference detected (p=0.054, 2.50 percentage points, 31.2% relative lift, alpha=0.05)."
+    }
 }
 ```
 ## Running Locally

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, Literal, Any
+from typing import Optional, Literal, Any, Dict
 from pydantic import BaseModel, ConfigDict, Field, field_validator, computed_field, model_validator
 from uuid import UUID
 
@@ -19,44 +19,38 @@ class RunCreate(BaseModel):
         return self
     
 class RunResultResponse(BaseModel):
-    observed_lift: float
+    model_config = ConfigDict(from_attributes=True)
+
+    conversion_rate_a: float
+    conversion_rate_b: float
+
+    absolute_lift: float
+    relative_lift: Optional[float] = None
+
     p_value: float
     z_statistic: Optional[float] = None
-    ci_low: Optional[float] = None
-    ci_high: Optional[float] = None
-    significant: bool
-    summary_json: Optional[dict[str, Any]] = Field(None, exclude=True)
 
-    @computed_field
-    @property
-    def summary(self) -> str:
-        """Dynamically extracts the summary text from the JSON blob."""
-        if self.summary_json and "summary" in self.summary_json:
-            return self.summary_json["summary"]
-        return "No summary available."
+    absolute_lift_ci_low: Optional[float] = None
+    absolute_lift_ci_high: Optional[float] = None
+
+    significant: bool
+    summary_json: Optional[Dict[str, Any]] = None
+    created_at: datetime
+
 
 class RunResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     experiment_id: UUID
     method: str
-    status: Literal["queued", "running", "success", "failed"]
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    n_sim: Optional[int] = None
+    seed: Optional[int] = None
+    status: str
+    progress: float
+    error_message: Optional[str] = None
+    created_at: datetime
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
-    progress: Optional[float] = Field(default = None, ge = 0.0, le = 1.0)
-    error_message: Optional[str]
+
     results: Optional[RunResultResponse] = None
-
-    model_config = ConfigDict(from_attributes = True)
-
-    @model_validator(mode='after')
-    def validate_run_status(self) -> 'RunResponse':
-        if self.status == "success" and self.results is None:
-            raise ValueError("results are required when status is 'success'")
-        if self.status != "success" and self.results is not None:
-            raise ValueError("results must be null unless status is 'success'")
-        
-        if self.status == "failed" and not self.error_message:
-            raise ValueError("error_message is required when status is 'failed'")
-            
-        return self
