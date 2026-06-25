@@ -10,7 +10,7 @@ Function: apiCall(endpoint, options) -> Promise
   - Wraps fetch()
   - Handles auth, errors, JSON parsing*/
 
-async function apiCall(endpoint, options):Promise {
+/*async function apiCall(endpoint, options):Promise {
   const token = getToken()
   const headers = {
     'Content-Type': 'application/json',
@@ -28,4 +28,4 @@ async function apiCall(endpoint, options):Promise {
   }
   
   return response.json()
-}
+}*/
