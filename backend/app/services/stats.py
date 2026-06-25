@@ -1,5 +1,6 @@
 from scipy.stats import norm
 import math
+import numpy as np
 
 
 def generate_summary(
@@ -166,4 +167,58 @@ def z_test_two_proportions(
         "alpha": alpha,
         "significant": significant,
         "summary": summary,
+    }
+
+def permutation_test(
+    n_a: int,
+    conv_a: int,
+    n_b: int,
+    conv_b: int,
+    n_sim: int = 20000,
+    seed: int = 42,
+    two_sided: bool = True,
+) -> dict:
+    if n_a <= 0:
+        raise ValueError("n_a must be greater than 0.")
+
+    if n_b <= 0:
+        raise ValueError("n_b must be greater than 0.")
+
+    if conv_a < 0 or conv_b < 0:
+        raise ValueError("Conversions cannot be negative.")
+
+    if conv_a > n_a:
+        raise ValueError("conv_a cannot exceed n_a.")
+
+    if conv_b > n_b:
+        raise ValueError("conv_b cannot exceed n_b.")
+    
+    np.random.seed(seed)
+
+    conversions = [1]*conv_a + [1]*conv_b + [0]*(n_a - conv_a) + [0]*(n_b - conv_b)
+    simulated_lifts = []
+
+    for i in range(n_sim):
+        np.random.shuffle(conversions)
+        a_conv = sum(conversions[:n_a])    
+        b_conv = sum(conversions[n_a:])
+        
+        a_rate = a_conv / n_a
+        b_rate = b_conv / n_b
+
+        if a_rate == 0:
+            lift = 0
+        else: 
+            lift = (b_rate - a_rate)/a_rate
+        simulated_lifts.appends(lift)
+    observed_lift = (conv_b/n_b - conv_a/n_a) / (conv_a/n_a)
+    count = sum(1 for sim_lift in simulated_lifts if abs(sim_lift) >= abs(observed_lift))
+    p_value = count / n_sim
+    
+    return {
+        "observed_lift": observed_lift,
+        "p_value": p_value,
+        "simulated_lifts": simulated_lifts,
+        "seed": seed,
+        "n_sim": n_sim,
     }
