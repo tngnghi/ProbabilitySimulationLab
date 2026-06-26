@@ -1,16 +1,8 @@
+import './auth';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-/*Create fetch wrapper that:
-  1. Reads token from localStorage
-  2. Adds Authorization header
-  3. Makes request to backend
-  4. If 401: call clearToken() + redirect to /login
-  5. Return response JSON
 
-Function: apiCall(endpoint, options) -> Promise
-  - Wraps fetch()
-  - Handles auth, errors, JSON parsing*/
-
-/*async function apiCall(endpoint, options):Promise {
+export async function apiCall<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getToken()
   const headers = {
     'Content-Type': 'application/json',
@@ -24,8 +16,14 @@ Function: apiCall(endpoint, options) -> Promise
   
   if (response.status === 401) {
     clearToken()
-    router.push('/login')
+    if (typeof window !== 'undefined') {
+      window.location.assign('/login');
+    }
+    throw new Error('Unauthorized');
+  }
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
   }
   
   return response.json()
-}*/
+}
