@@ -1,18 +1,31 @@
-/*Purpose: Landing page, explain what SimStat is
+'use client';   // needed if you use hooks (like redirect)
 
-Content:
+import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
+export default function HomePage() {
+  const { isLoggedIn } = useAuth();
+  const router = useRouter();
 
-Tagline: "A/B Testing Platform with Statistical Inference"
-Brief description
-"Log In" button
-"Register" button
-Maybe a demo animation (optional)
+  // If already logged in, send them straight to dashboard
+  useEffect(() => {
+    if (isLoggedIn) {
+      router.push('/dashboard');
+    }
+  }, [isLoggedIn, router]);
 
-
-Logic:
-
-if user is logged in:
-  redirect to /dashboard
-else:
-  show landing page with login/register buttons*/
+  return (
+    <main className="home-container">
+      <h1>A/B Testing Platform with Statistical Inference</h1>
+      <p className="home-subtitle">
+        Design, run, and analyse A/B tests with confidence.
+      </p>
+      <div className="home-actions">
+        <Link href="/login" className="btn btn-primary">Log In</Link>
+        <Link href="/register" className="btn btn-secondary">Register</Link>
+      </div>
+    </main>
+  );
+}

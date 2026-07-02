@@ -18,8 +18,6 @@ export default function Navbar() {
       {/* Left – Logo */}
       <div className="navbar__left">
         <Link href="/" className="logo">
-          {/* Replace with your actual logo image or text */}
-          <img src="/logo.svg" alt="SimStat" className="logo-img" />
           <span className="logo-text">SimStat</span>
         </Link>
       </div>

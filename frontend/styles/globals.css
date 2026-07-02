@@ -90,7 +90,7 @@ body { font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #1a1a1
 }
 
 .logout-text {
-  /* Show text on desktop, can hide on small screens if desired */
+  display: inline;
 }
 
 /* Mobile responsiveness */
