@@ -15,6 +15,7 @@ from app.api.deps import get_current_user, get_db
 import json
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 
 class PrettyJSONResponse(JSONResponse):
@@ -31,6 +32,20 @@ class PrettyJSONResponse(JSONResponse):
 app = FastAPI(
     title="Probability Simulation Lab",
     default_response_class=PrettyJSONResponse,
+)
+
+origins = [
+    "http://localhost:3000",          # local dev
+    "https://probsimlab.vercel.app/",  # production Vercel URL
+    # add any other frontend URLs
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],          # allows OPTIONS, GET, POST, etc.
+    allow_headers=["*"],          # allows Authorization, Content-Type
 )
 
 if __name__ == '__main__':

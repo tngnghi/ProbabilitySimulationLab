@@ -66,3 +66,19 @@ else:
     2. Call apiCall('POST /experiments/{id}/runs', {...})
     3. Get run_id from response
     4. Redirect to /experiments/{id}/results?run_id={run_id}*/
+  
+'use client';
+
+import { useParams } from 'next/navigation';
+
+export default function ExperimentDetailPage() {
+  const params = useParams();
+  const experimentId = params.id;
+
+  return (
+    <div>
+      <h1>Experiment {experimentId}</h1>
+      <p>Details and data upload form go here.</p>
+    </div>
+  );
+}

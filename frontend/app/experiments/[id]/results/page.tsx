@@ -95,3 +95,18 @@ Logic:
      - Call Plotly.purge(div)
   3. On props change:
      - Update chart with Plotly.react()*/
+'use client';
+
+import { useParams } from 'next/navigation';
+
+export default function ResultsPage() {
+  const params = useParams();
+  const experimentId = params.id;
+
+  return (
+    <div>
+      <h1>Results for Experiment {experimentId}</h1>
+      <p>Charts and analysis will appear here.</p>
+    </div>
+  );
+}
