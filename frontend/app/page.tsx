@@ -23,8 +23,6 @@ export default function HomePage() {
         Design, run, and analyse A/B tests with confidence.
       </p>
       <div className="home-actions">
-        <Link href="/login" className="btn btn-primary">Log In</Link>
-        <Link href="/register" className="btn btn-secondary">Register</Link>
       </div>
     </main>
   );
