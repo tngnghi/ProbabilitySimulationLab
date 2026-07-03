@@ -1,3 +1,4 @@
+import { ReactNode } from 'react';              // <-- add this line
 import { AuthProvider } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
 import '@/styles/globals.css';
