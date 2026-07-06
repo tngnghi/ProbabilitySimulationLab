@@ -97,16 +97,67 @@ Logic:
      - Update chart with Plotly.react()*/
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
+import ErrorAlert from '@/components/ErrorAlert';
+import LoadingSpinner from '@/components/LoadingSpinner';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export default function ResultsPage() {
-  const params = useParams();
-  const experimentId = params.id;
+  const { id } = useParams();
+  const searchParams = useSearchParams();
+  const runId = searchParams.get('run_id');
+  const { token, isLoggedIn } = useAuth();
+  const router = useRouter();
+  const [results, setResults] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!isLoggedIn) { router.push('/login'); return; }
+    if (!runId) { setError('No run ID provided'); setLoading(false); return; }
+    fetchResults();
+  }, [runId, isLoggedIn]);
+
+  const fetchResults = async () => {
+    try {
+      const res = await fetch(`${API_URL}/runs/${runId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to load results');
+      const data = await res.json();
+      // If run is still processing, you might need to poll, but for simplicity assume immediate
+      setResults(data);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isLoggedIn || loading) return <LoadingSpinner />;
+  if (error) return <ErrorAlert message={error} />;
+  if (!results) return <p>No results found.</p>;
 
   return (
-    <div>
-      <h1>Results for Experiment {experimentId}</h1>
-      <p>Charts and analysis will appear here.</p>
+    <div className="results-page">
+      <h1>Results for Experiment {id}</h1>
+      <div className="summary">
+        <p>Observed Lift: {results.results?.observed_lift ?? 'N/A'}</p>
+        <p>P-value: {results.results?.p_value ?? 'N/A'}</p>
+        <p>Significant: {results.results?.significant ? 'Yes' : 'No'}</p>
+        <p>Confidence Interval: [{results.results?.ci_low}, {results.results?.ci_high}]</p>
+        <p>{results.results?.summary}</p>
+      </div>
+      {results.results?.charts && (
+        <div className="charts">
+          {/* You can integrate Plotly here later */}
+          <p>Charts will render here.</p>
+        </div>
+      )}
+      <button onClick={() => router.push(`/experiments/${id}`)}>Back to Experiment</button>
     </div>
   );
 }

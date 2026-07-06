@@ -27,3 +27,27 @@ export async function apiCall<T = any>(endpoint: string, options: RequestInit = 
   
   return response.json()
 }
+/*// lib/api.ts (simple fetch wrapper)
+export async function apiCall(endpoint: string, options: RequestInit = {}) {
+  const token = getToken();
+  const headers: any = { ...options.headers };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${endpoint}`, {
+    ...options,
+    headers,
+  });
+
+  if (res.status === 401) {
+    clearToken();
+    window.location.href = '/login'; // force full redirect
+    throw new Error('Session expired. Please log in again.');
+  }
+
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.detail || `Request failed with status ${res.status}`);
+  }
+
+  return res.json();
+}*/
