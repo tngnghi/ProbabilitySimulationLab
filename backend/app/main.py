@@ -36,7 +36,7 @@ app = FastAPI(
 
 origins = [
     "http://localhost:3000",          # local dev
-    "https://probsimlab.vercel.app/",  # production Vercel URL
+    "https://probsimlab.vercel.app",  # production Vercel URL
 ]
 
 app.add_middleware(
