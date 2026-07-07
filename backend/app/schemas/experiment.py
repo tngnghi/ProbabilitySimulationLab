@@ -34,20 +34,37 @@ class ExperimentUpdate(BaseModel):
     two_sided: Optional[bool] = None
     metric: Optional[str] = None
 
+class ExperimentDataResponse(BaseModel):
+    n_a: int
+    conv_a: int
+    n_b: int
+    conv_b: int
+    data_source: Literal["aggregate", "events"]
+    updated_at: datetime = Field(default_factory=datetime.now)
+    warnings: Optional[list[str]] = None
+
+    conv_rate_a: Optional[float] = None
+    conv_rate_b: Optional[float] = None
+    observed_lift: Optional[float] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
 class ExperimentResponse(BaseModel):
     id: UUID
     user_id: UUID
     name: str
-    description: str |None = None
+    description: Optional[str] = None
     alpha: float
     two_sided: bool
     metric: str
     created_at: datetime
     updated_at: datetime
-    data: Optional[dict] = None
+
+    data: Optional[ExperimentDataResponse] = None
+
     warnings: Optional[list[str]] = None
 
-    model_config = ConfigDict(from_attributes =True, arbitrary_types_allowed =True)
+    model_config = ConfigDict(from_attributes=True)
 
 class ExperimentDataCreate(BaseModel):
     n_a: int = Field(..., gt=0)
@@ -76,17 +93,6 @@ class ExperimentDataCreate(BaseModel):
         if v > info.data.get('n_b', 0):
             raise ValueError('conv_b cannot exceed n_b')
         return v
-    
-class ExperimentDataResponse(BaseModel):
-    n_a: int
-    conv_a: int
-    n_b: int
-    conv_b: int
-    data_source: Literal["aggregate","events"]
-    updated_at: datetime = Field(default_factory=datetime.now)
-    warnings: Optional[list[str]] = None
-    
-    model_config = ConfigDict(from_attributes = True)
 
 class ExperimentDataUpdate(BaseModel):
     n_a: Optional[int] = None

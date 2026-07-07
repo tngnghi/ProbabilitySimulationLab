@@ -1,46 +1,28 @@
 import { getToken, clearToken } from './auth';
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-export async function apiCall<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = getToken()
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` })
-  }
-  
-  const response = await fetch(API_URL + endpoint, {
-    ...options,
-    headers
-  })
-  
-  if (response.status === 401) {
-    clearToken()
-    if (typeof window !== 'undefined') {
-      window.location.assign('/login');
-    }
-    throw new Error('Unauthorized');
-  }
-  if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
-  }
-  
-  return response.json()
-}
-/*// lib/api.ts (simple fetch wrapper)
-export async function apiCall(endpoint: string, options: RequestInit = {}) {
+export async function apiCall<T = any>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
   const token = getToken();
-  const headers: any = { ...options.headers };
-  if (token) headers.Authorization = `Bearer ${token}`;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string>),
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
 
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${endpoint}`, {
+  const res = await fetch(`${API_URL}${endpoint}`, {
     ...options,
     headers,
   });
 
   if (res.status === 401) {
     clearToken();
-    window.location.href = '/login'; // force full redirect
+    window.location.href = '/login';
     throw new Error('Session expired. Please log in again.');
   }
 
@@ -50,4 +32,15 @@ export async function apiCall(endpoint: string, options: RequestInit = {}) {
   }
 
   return res.json();
-}*/
+}
+
+export function getErrorMessage(err: unknown): string {
+  if (typeof err === 'string') return err;
+  if (err instanceof Error) return err.message;
+  // If the backend returned an error object like { detail: '...' }
+  if (typeof err === 'object' && err !== null && 'detail' in err) {
+    return String((err as any).detail);
+  }
+  // Fallback
+  return JSON.stringify(err);
+}

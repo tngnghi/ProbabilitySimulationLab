@@ -1,4 +1,6 @@
+// components/ProtectedRoute.tsx
 'use client';
+
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -20,11 +22,3 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
 
   return <>{children}</>;
 }
-/*// Example in dashboard
-export default function DashboardPage() {
-  return (
-    <ProtectedRoute>
-      {/* dashboard content */}
-    //</ProtectedRoute>
- // );
-//}

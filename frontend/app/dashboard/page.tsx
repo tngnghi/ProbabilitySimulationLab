@@ -50,19 +50,17 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { apiCall } from '@/lib/api';
 import ErrorAlert from '@/components/ErrorAlert';
 import LoadingSpinner from '@/components/LoadingSpinner';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
 export default function DashboardPage() {
-  const { token, isLoggedIn } = useAuth();
+  const { isLoggedIn } = useAuth();
   const router = useRouter();
-  const [experiments, setExperiments] = useState([]);
+  const [experiments, setExperiments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Form state
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [alpha, setAlpha] = useState(0.05);
@@ -76,15 +74,11 @@ export default function DashboardPage() {
       return;
     }
     fetchExperiments();
-  }, [isLoggedIn]);
+  }, [isLoggedIn, router]);
 
   const fetchExperiments = async () => {
     try {
-      const res = await fetch(`${API_URL}/experiments`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error('Failed to load experiments');
-      const data = await res.json();
+      const data = await apiCall<any[]>('/experiments');
       setExperiments(data);
     } catch (err: any) {
       setError(err.message);
@@ -98,21 +92,17 @@ export default function DashboardPage() {
     setCreating(true);
     setError('');
     try {
-      const res = await fetch(`${API_URL}/experiments`, {
+      await apiCall('/experiments', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ name, description, alpha, two_sided: twoSided, metric }),
+        body: JSON.stringify({
+          name,
+          description,
+          alpha,
+          two_sided: twoSided,
+          metric,
+        }),
       });
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.detail || 'Failed to create experiment');
-      }
-      // Refresh list
       await fetchExperiments();
-      // Clear form
       setName('');
       setDescription('');
     } catch (err: any) {
@@ -126,49 +116,96 @@ export default function DashboardPage() {
   if (loading) return <LoadingSpinner />;
 
   return (
-    <div className="dashboard">
+    <div className="dashboard container">
       <h1>Dashboard</h1>
       {error && <ErrorAlert message={error} onClose={() => setError('')} />}
 
-      <section className="experiment-list">
+      {/* Experiment list */}
+      <section className="experiments-section">
         <h2>Your Experiments</h2>
         {experiments.length === 0 ? (
-          <p>No experiments yet. Create one below.</p>
+          <div className="empty-state">
+            <p>No experiments yet. Create your first one!</p>
+          </div>
         ) : (
-          <ul>
+          <div className="experiment-grid">
             {experiments.map((exp: any) => (
-              <li key={exp.id}>
-                <Link href={`/experiments/${exp.id}`}>{exp.name}</Link>
-                <span>Created: {new Date(exp.created_at).toLocaleDateString()}</span>
-              </li>
+              <Link href={`/experiments/${exp.id}`} key={exp.id} className="experiment-card">
+                <div className="card-header">
+                  <h3>{exp.name}</h3>
+                  <span className="card-date">
+                    {new Date(exp.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+                <p className="card-description">
+                  {exp.description || 'No description'}
+                </p>
+                <div className="card-meta">
+                  <span>α: {exp.alpha}</span>
+                  <span>{exp.two_sided ? 'Two‑sided' : 'One‑sided'}</span>
+                  <span>{exp.metric}</span>
+                </div>
+                <div className="card-arrow">→</div>
+              </Link>
             ))}
-          </ul>
+          </div>
         )}
       </section>
 
-      <section className="create-experiment">
+      {/* Create form */}
+      <section className="create-section">
         <h2>Create New Experiment</h2>
-        <form onSubmit={handleCreate}>
-          <label>Name (required)</label>
-          <input type="text" required value={name} onChange={e => setName(e.target.value)} />
-          <label>Description</label>
-          <textarea value={description} onChange={e => setDescription(e.target.value)} />
-          <label>Alpha</label>
-          <select value={alpha} onChange={e => setAlpha(parseFloat(e.target.value))}>
-            <option value={0.01}>0.01</option>
-            <option value={0.05}>0.05</option>
-            <option value={0.10}>0.10</option>
-          </select>
+        <form onSubmit={handleCreate} className="create-form">
+          <div className="form-row">
+            <label>
+              Name *
+              <input
+                type="text"
+                required
+                placeholder="e.g., Homepage Button Test"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </label>
+            <label>
+              Metric
+              <select value={metric} onChange={(e) => setMetric(e.target.value)}>
+                <option value="conversion">Conversion</option>
+                <option value="click-through-rate">Click‑through Rate</option>
+              </select>
+            </label>
+          </div>
+
           <label>
-            <input type="checkbox" checked={twoSided} onChange={e => setTwoSided(e.target.checked)} />
-            Two-sided test
+            Description
+            <textarea
+              rows={2}
+              placeholder="Optional description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
           </label>
-          <label>Metric</label>
-          <select value={metric} onChange={e => setMetric(e.target.value)}>
-            <option value="conversion">Conversion</option>
-            <option value="click-through-rate">Click-through Rate</option>
-          </select>
-          <button type="submit" disabled={creating}>
+
+          <div className="form-row">
+            <label>
+              Alpha
+              <select value={alpha} onChange={(e) => setAlpha(parseFloat(e.target.value))}>
+                <option value={0.01}>0.01</option>
+                <option value={0.05}>0.05</option>
+                <option value={0.10}>0.10</option>
+              </select>
+            </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={twoSided}
+                onChange={(e) => setTwoSided(e.target.checked)}
+              />
+              Two‑sided test
+            </label>
+          </div>
+
+          <button type="submit" disabled={creating} className="btn btn-primary">
             {creating ? 'Creating...' : 'Create Experiment'}
           </button>
         </form>

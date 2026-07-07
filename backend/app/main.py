@@ -7,7 +7,7 @@ from app.schemas.auth import UserResponse
 from sqlalchemy.orm import Session
 from app.core.security import hash_password, verify_password, create_access_token
 from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse
-from app.api.routes import experiments
+from app.api.routes import experiments, runs
 from app.core.config import settings
 import logging
 from app.api.deps import get_current_user, get_db
@@ -37,7 +37,6 @@ app = FastAPI(
 origins = [
     "http://localhost:3000",          # local dev
     "https://probsimlab.vercel.app/",  # production Vercel URL
-    # add any other frontend URLs
 ]
 
 app.add_middleware(
@@ -93,6 +92,7 @@ async def read_current_user(current_user: User = Depends(get_current_user)):
 
 #Experiments
 app.include_router(experiments.router)
+app.include_router(runs.router)
 
 # Health check
 @app.get("/health", status_code=200)

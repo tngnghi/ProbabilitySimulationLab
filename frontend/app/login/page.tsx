@@ -15,14 +15,15 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // If already logged in, redirect to dashboard
+  // Redirect after mount, not during render
   useEffect(() => {
     if (isLoggedIn) {
       router.push('/dashboard');
     }
-  }, [isLoggedIn, router])
+  }, [isLoggedIn, router]);
+
+  // Show spinner while redirecting (no router.push here)
   if (isLoggedIn) {
-    router.push('/dashboard');
     return <LoadingSpinner />;
   }
 
@@ -32,7 +33,6 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      // login function redirects to /dashboard on success
     } catch (err: any) {
       setError(err.message || 'Login failed');
     } finally {
@@ -69,7 +69,7 @@ export default function LoginPage() {
         </button>
       </form>
       <p>
-        Don’t have an account? <Link href="/register">Register</Link>
+        Don't have an account? <Link href="/register">Register</Link>
       </p>
     </div>
   );

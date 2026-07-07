@@ -74,19 +74,18 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import ErrorAlert from '@/components/ErrorAlert';
 import LoadingSpinner from '@/components/LoadingSpinner';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+import { apiCall } from '@/lib/api';
 
 export default function ExperimentDetailPage() {
   const { id } = useParams();
-  const { token, isLoggedIn } = useAuth();
+  const { isLoggedIn } = useAuth();
   const router = useRouter();
+
   const [experiment, setExperiment] = useState<any>(null);
-  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Upload form state
+  // Data upload
   const [nA, setNA] = useState('');
   const [convA, setConvA] = useState('');
   const [nB, setNB] = useState('');
@@ -104,16 +103,8 @@ export default function ExperimentDetailPage() {
 
   const fetchExperiment = async () => {
     try {
-      const res = await fetch(`${API_URL}/experiments/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error('Experiment not found');
-      const expData = await res.json();
-      setExperiment(expData);
-      // Check if experiment has data
-      if (expData.data) {
-        setData(expData.data);
-      }
+      const data = await apiCall(`/experiments/${id}`);
+      setExperiment(data);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -124,7 +115,6 @@ export default function ExperimentDetailPage() {
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    // Basic client-side validation
     const n_a = parseInt(nA), conv_a = parseInt(convA), n_b = parseInt(nB), conv_b = parseInt(convB);
     if (conv_a > n_a || conv_b > n_b) {
       setError('Conversions cannot exceed total count');
@@ -132,21 +122,10 @@ export default function ExperimentDetailPage() {
     }
     setUploading(true);
     try {
-      const res = await fetch(`${API_URL}/experiments/${id}/data/aggregate`, {
+      const result = await apiCall(`/experiments/${id}/data/aggregate`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({ n_a, conv_a, n_b, conv_b }),
       });
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.detail || 'Upload failed');
-      }
-      const result = await res.json();
-      setData(result);
-      // Update experiment data locally
       setExperiment({ ...experiment, data: result });
     } catch (err: any) {
       setError(err.message);
@@ -159,19 +138,20 @@ export default function ExperimentDetailPage() {
     setError('');
     setRunning(true);
     try {
-      const body: any = { method };
-      const res = await fetch(`${API_URL}/experiments/${id}/runs`, {
+      const runData = await apiCall<any>(`/experiments/${id}/runs`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ method }),
       });
-      if (!res.ok) throw new Error('Failed to start analysis');
-      const runData = await res.json();
-      // Redirect to results page
-      router.push(`/experiments/${id}/results?run_id=${runData.run_id}`);
+      router.push(`/experiments/${id}/results?run_id=${runData.id}`);
+
+      console.log('Run response:', runData);
+
+      const runId = runData.id;
+
+      if (!runId) {
+        setError('Analysis started but no run ID returned.');
+        return;
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -181,6 +161,8 @@ export default function ExperimentDetailPage() {
 
   if (!isLoggedIn || loading) return <LoadingSpinner />;
   if (error && !experiment) return <ErrorAlert message={error} />;
+
+  const data = experiment?.data;
 
   return (
     <div className="experiment-detail">
@@ -193,14 +175,9 @@ export default function ExperimentDetailPage() {
         <h2>Data</h2>
         {data ? (
           <div>
-            <p>Group A: {data.conv_a} / {data.n_a} ({data.conv_rate_a})</p>
-            <p>Group B: {data.conv_b} / {data.n_b} ({data.conv_rate_b})</p>
-            <p>Lift: {data.observed_lift}</p>
-            {data.warnings?.length > 0 && (
-              <ul className="warnings">
-                {data.warnings.map((w: string, i: number) => <li key={i}>{w}</li>)}
-              </ul>
-            )}
+            <p>Group A: {data.conv_a} / {data.n_a} ({(data.conv_rate_a * 100).toFixed(1)}%)</p>
+            <p>Group B: {data.conv_b} / {data.n_b} ({(data.conv_rate_b * 100).toFixed(1)}%)</p>
+            <p>Observed Lift: {data.observed_lift}</p>
           </div>
         ) : (
           <p>No data uploaded yet.</p>

@@ -199,3 +199,283 @@ body { font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #1a1a1
   border-radius: 6px;
   cursor: pointer;
 }
+
+/* Results page styling */
+.results-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  margin-top: 1rem;
+}
+
+.result-banner {
+  text-align: center;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+}
+
+.result-banner.significant {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.result-banner.not-significant {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+.summary-text {
+  font-size: 1.1rem;
+  margin-top: 0.5rem;
+}
+
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.result-item {
+  background: #f9fafb;
+  padding: 1rem;
+  border-radius: 8px;
+  text-align: center;
+  border: 1px solid #e5e7eb;
+}
+
+.result-item .label {
+  display: block;
+  font-size: 0.9rem;
+  color: #6b7280;
+  margin-bottom: 0.25rem;
+}
+
+.result-item .value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.conversion-rates {
+  background: #f9fafb;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.ci-box {
+  background: #f9fafb;
+  padding: 1rem;
+  border-radius: 8px;
+  text-align: center;
+  margin-bottom: 1.5rem;
+  font-size: 1.1rem;
+}
+
+.back-btn {
+  padding: 0.6rem 1.4rem;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.back-btn:hover {
+  background: #1d4ed8;
+}
+
+/* ── Dashboard Layout ── */
+.dashboard {
+  padding: 2rem 0;
+}
+
+.dashboard h1 {
+  font-size: 2rem;
+  margin-bottom: 2rem;
+}
+
+/* ── Experiment Cards Grid ── */
+.experiment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.25rem;
+  margin-top: 1rem;
+}
+
+.experiment-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  border: 1px solid #e5e7eb;
+  transition: box-shadow 0.2s, transform 0.2s;
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.experiment-card:hover {
+  box-shadow: 0 8px 16px rgba(0,0,0,0.08);
+  transform: translateY(-2px);
+  border-color: #2563eb;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.card-header h3 {
+  font-size: 1.1rem;
+  margin: 0;
+  color: #111827;
+}
+
+.card-date {
+  font-size: 0.8rem;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.card-description {
+  color: #4b5563;
+  margin-bottom: 1rem;
+  flex-grow: 1;
+}
+
+.card-meta {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.card-arrow {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  font-size: 1.2rem;
+  color: #9ca3af;
+  transition: color 0.2s;
+}
+
+.experiment-card:hover .card-arrow {
+  color: #2563eb;
+}
+
+/* Empty state */
+.empty-state {
+  background: #f9fafb;
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+  padding: 3rem;
+  text-align: center;
+  color: #6b7280;
+  margin-top: 1rem;
+}
+
+/* ── Create Form Section ── */
+.create-section {
+  margin-top: 3rem;
+  /* same max-width as the container (set globally) */
+  width: 100%;
+}
+
+.create-form {
+  background: #ffffff;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  border: 1px solid #e5e7eb;
+  /* REMOVE the fixed max-width */
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Row for side-by-side fields */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;      /* equal columns */
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+/* Full-width fields (like Description) */
+.form-full-width {
+  display: block;
+  margin-bottom: 1rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+/* Standard field labels */
+.create-form label {
+  display: flex;
+  flex-direction: column;
+  font-weight: 500;
+  color: #374151;
+  gap: 0.3rem;
+}
+
+.create-form input,
+.create-form select,
+.create-form textarea {
+  padding: 0.6rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-family: inherit;
+}
+
+/* Checkbox label – keep it inline */
+.checkbox-label {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+/* Primary button */
+.btn-primary {
+  background: #2563eb;
+  color: white;
+  padding: 0.7rem 1.8rem;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-top: 0.5rem;
+}
+
+.btn-primary:hover {
+  background: #1d4ed8;
+}
+
+.btn-primary:disabled {
+  background: #93c5fd;
+  cursor: not-allowed;
+}
+
+/* ── Responsive tweak ── */
+@media (max-width: 640px) {
+  .form-row {
+    grid-template-columns: 1fr;   /* stack on mobile */
+  }
+}
