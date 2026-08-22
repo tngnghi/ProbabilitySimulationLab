@@ -210,7 +210,9 @@ def permutation_test(
             lift = 0
         else: 
             lift = (b_rate - a_rate)/a_rate
-        simulated_lifts.appends(lift)
+            
+        simulated_lifts.append(lift)
+
     observed_lift = (conv_b/n_b - conv_a/n_a) / (conv_a/n_a)
     count = sum(1 for sim_lift in simulated_lifts if abs(sim_lift) >= abs(observed_lift))
     p_value = count / n_sim

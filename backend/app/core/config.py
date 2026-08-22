@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     env_name: str = "development"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 7
+    redis_url: str
 
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env", 
@@ -22,6 +23,7 @@ class Settings(BaseSettings):
 
 settings = Settings()
 # Now in code, use: settings.database_url instead of os.getenv()
+
 
 """app = FastAPI()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")

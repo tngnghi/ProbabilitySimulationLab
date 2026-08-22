@@ -1,6 +1,6 @@
 from typing import List
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from app.api.deps import get_current_user, get_db
 from app.models.user import User
 from app.schemas.experiment import ExperimentDataResponse, ExperimentResponse, ExperimentUpdate, ExperimentCreate, ExperimentDataCreate, ExperimentDataUpdate
@@ -10,6 +10,7 @@ from app.models.run import Run, RunResult
 from app.services.stats import z_test_two_proportions
 from sqlalchemy.orm import Session, joinedload
 from app.services.validations import validate_aggregated_data
+from app.services.tasks import run_analysis_task
 from uuid import uuid4, UUID
 
 router = APIRouter(prefix="/experiments", tags=["experiments"])
@@ -249,6 +250,12 @@ async def create_run(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    if run_req.method not in ["ztest", "permutation"]:
+        raise HTTPException(
+            status_code=422,
+            detail="method must be 'ztest' or 'permutation'"
+        )
+    
     experiment = (
         db.query(Experiment)
         .options(joinedload(Experiment.data))
@@ -268,85 +275,19 @@ async def create_run(
             detail="No experiment data uploaded. Upload aggregate data before running analysis.",
         )
 
-    run_req.validate_conditional_logic()
-
-    if run_req.method != "ztest":
-        raise HTTPException(
-            status_code=501,
-            detail="Only ztest is currently implemented. Permutation testing is in progress.",
-        )
-
-    new_run = Run(
-        id=uuid4(),
-        experiment_id=experiment_id,
+    # Queue the task
+    task = run_analysis_task.delay(
+        run_id=str(run_req.id),
+        experiment_id=str(experiment_id),
         method=run_req.method,
-        n_sim=run_req.n_sim,
-        seed=run_req.seed,
-        status="queued",
-        progress=0.0,
-        created_at=datetime.now(timezone.utc),
+        n_a=experiment.data.n_a,
+        conv_a=experiment.data.conv_a,
+        n_b=experiment.data.n_b,
+        conv_b=experiment.data.conv_b,
+        n_sim=run_req.n_sim or 20000,
+        seed=run_req.seed or 42
     )
-
-    db.add(new_run)
-    db.commit()
-    db.refresh(new_run)
-
-    try:
-        new_run.status = "running"
-        new_run.started_at = datetime.now(timezone.utc)
-        new_run.progress = 0.25
-        db.commit()
-
-        result = z_test_two_proportions(
-            n_a=experiment.data.n_a,
-            conv_a=experiment.data.conv_a,
-            n_b=experiment.data.n_b,
-            conv_b=experiment.data.conv_b,
-            alpha=experiment.alpha,
-            two_sided=experiment.two_sided,
-        )
-
-        run_result = RunResult(
-            run_id=new_run.id,
-            conversion_rate_a=float(result["conversion_rate_a"]),
-            conversion_rate_b=float(result["conversion_rate_b"]),
-            absolute_lift=float(result["absolute_lift"]),
-            relative_lift=(
-                float(result["relative_lift"])
-                if result["relative_lift"] is not None
-                else None
-            ),
-            p_value=float(result["p_value"]),
-            z_statistic=float(result["z_statistic"]),
-            absolute_lift_ci_low=float(result["absolute_lift_ci_low"]),
-            absolute_lift_ci_high=float(result["absolute_lift_ci_high"]),
-            significant=bool(result["significant"]),
-            summary_json={"summary": result["summary"]},
-        )
-
-        db.add(run_result)
-
-        new_run.status = "success"
-        new_run.progress = 1.0
-        new_run.finished_at = datetime.now(timezone.utc)
-
-        db.commit()
-        db.refresh(new_run)
-
-        return new_run
-
-    except HTTPException:
-        raise
-
-    except Exception as e:
-        db.rollback()
-
-        new_run.status = "failed"
-        new_run.progress = 0.0
-        new_run.error_message = str(e)
-        new_run.finished_at = datetime.now(timezone.utc)
-
-        db.commit()
-        db.refresh(new_run)
-
-        raise HTTPException(status_code=500, detail=str(e))
+    
+    print(f"✅ Task queued with ID: {task.id}")  # Debug
+    
+    return RunResponse.from_orm(new_run)
